@@ -1,143 +1,68 @@
 "use strict";
 
+function getLearnerData(assignments, submissions) {
+  const results = [];
 
+  // Map assignmentId -> assignment info (so we can get dueDate)
+  const assignmentsById = new Map();
+  for (const a of assignments) {
+    assignmentsById.set(a.id, a);
+  }
 
+  // Map learnerId -> Map(assignmentId -> submissionData)
+  const learnerMap = new Map();
+  for (const sub of submissions) {
+    if (!learnerMap.has(sub.learner_id)) {
+      learnerMap.set(sub.learner_id, new Map());
+    }
+    learnerMap.get(sub.learner_id).set(sub.assignment_id, {
+      score: sub.submission.score,
+      pointsPossible: sub.submission.points_possible,
+      submittedAt: new Date(sub.submission.submitted_at)
+    });
+  }
 
-const results = [];
+  // Loop through each learner
+  for (const [learnerId, assignmentsMap] of learnerMap.entries()) {
+    let totalScore = 0;
+    let totalPossible = 0;
 
+    const assignmentPercentages = {};
 
+    // Loop through each assignment submission
+    for (const [assignmentId, data] of assignmentsMap.entries()) {
+      let score = data.score;
+      const pointsPossible = data.pointsPossible;
+      const submittedAt = data.submittedAt;
 
+      const dueDate = new Date(assignmentsById.get(assignmentId).due_date);
 
-// Loop through each learner
+      // Late penalty (10% off)
+      if (submittedAt > dueDate) {
+        score = Math.max(score - pointsPossible * 0.1, 0);
+      }
 
-for (const [learnerId, assignments] of learnerMap.entries()) {
+      totalScore += score;
+      totalPossible += pointsPossible;
 
+      assignmentPercentages[assignmentId] = Number((score / pointsPossible).toFixed(3));
+    }
 
+    const average = totalPossible === 0 ? 0 : totalScore / totalPossible;
 
+    const learnerResult = {
+      id: learnerId,
+      avg: Number(average.toFixed(3)),
+      ...assignmentPercentages
+    };
 
-let totalScore = 0;
+    results.push(learnerResult);
+  }
 
-let totalPossible = 0;
-
-
-
-
-const assignmentPercentages = {};
-
-
-
-
-// Loop through each assignment submission
-
-for (const [assignmentId, data] of assignments.entries()) {
-
-
-
-
-let score = data.score;
-
-const pointsPossible = data.pointsPossible;
-
-const submittedAt = data.submittedAt;
-
-
-
-
-// Apply late penalty if submitted after due date
-
-const dueDate = assignmentsById.get(assignmentId).dueDate;
-
-if (submittedAt > dueDate) {
-
-score = Math.max(score - pointsPossible * 0.1, 0);
-
+  return results;
 }
 
-
-
-
-// Add to totals for weighted average
-
-totalScore += score;
-
-totalPossible += pointsPossible;
-
-
-
-
-// Calculate percentage score
-
-assignmentPercentages[assignmentId] = Number((score / pointsPossible).toFixed(3));
-
+// ✅ Only attach to window if you're in a browser
+if (typeof window !== "undefined") {
+  window.getLearnerData = getLearnerData;
 }
-
-
-
-
-// Calculate weighted average
-
-const average = totalPossible === 0 ? 0 : totalScore / totalPossible;
-
-
-
-
-// Build learner result object
-
-const learnerResult = {
-
-id: learnerId,
-
-avg: Number(average.toFixed(3))
-
-};
-
-
-
-
-// Add assignment percentages to learner object
-
-for (const assignmentId in assignmentPercentages) {
-
-learnerResult[assignmentId] = assignmentPercentages[assignmentId];
-
-}
-
-
-
-
-// Add learner result to final array
-
-results.push(learnerResult);
-
-}
-
-
-
-
-// Return final formatted results
-
-return results;
-
-
-
-
-try {
-
-// ...code that may throw
-
-} catch (err) {
-
-console.error(err);
-
-}
-
-
-
-
-// -----------------------------------------------------------
-
-// Make function accessible in browser-based grading systems
-
-// -----------------------------------------------------------
-
-window.getLearnerData = getLearnerData;
